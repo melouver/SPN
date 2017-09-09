@@ -15,6 +15,8 @@ const int Nr = 4;
 const int l = 4;
 const int m = 4;
 const int pairs_cnt = 8000;
+const int da_pairs_cnt = 80;
+char input_or = 0xB;
 
 unsigned s_m[] = {14,4,13,1,2,15,11,8,3,10,6,12,5,9,0,7};
 unsigned p_m[] = {1,5,9,13,2,6,10,14,3,7,11,15,4,8,12,16};
@@ -42,7 +44,7 @@ void geneRoundKeys(uint32_t k, unsigned short K_all[Nr+1]) {
     }
 }
 
-unsigned  short spn_encrypt(unsigned short x, sBoxTrans pi_s, pBoxTrans pi_p, unsigned short K_all[Nr+1]) {
+unsigned  short spn_encryption(unsigned short x, sBoxTrans pi_s, pBoxTrans pi_p, unsigned short *K_all) {
     unsigned short w = x, u, v;
 
     for (int r = 1; r < Nr; r++) {
@@ -114,36 +116,117 @@ void linear_attack(unsigned short X[pairs_cnt], unsigned short Y[pairs_cnt]) {
 
         K |= (i&0xF)<<4;
 
-        geneRoundKeys(K, roundKey);
-        test = spn_encrypt(x, sTrans, pTrans, roundKey);
+        geneRoundKeys(K, roundKey);test = spn_encryption(x, sTrans, pTrans, roundKey);
+
         if (test == y) {
-            CNT++;
+            // Got the 32bit Key needed
         }
     }
 }
 
+void differential_cryptanalysis(unsigned short X[], unsigned short X_astrk[], unsigned short Y[], unsigned short Y_astrk[], int T) {
+    int count[16][16] = {0};
+    unsigned short x, x_ast, y, y_ast;
+    char v4, u4, v4_ast, u4_ast, u4_prm;
 
+    for (int i = 0; i < T; i++) {
+        x = X[i]; x_ast = X_astrk[i]; y = Y[i]; y_ast = Y_astrk[i];
 
-unsigned short X[pairs_cnt]={0};
-unsigned short Y[pairs_cnt]={0};
+        if (((y >> 12) == (y_ast>>12)) &&
+                (((y >> 4)&0xF) == ((y_ast>>4)&0xF))) {
+            for (int i = 0; i < 16; i++) {
+                for (int j = 0; j < 16; j++) {
+                    u4 = v4 = 0;
+
+                    v4 |= ((i ^ (y>>8))&0xF)<<4;
+                    v4 |= (j ^ y)&0xF;
+
+                    u4 |= inv_s_m[v4>>4&0xF]<<4;
+                    u4 |= inv_s_m[v4&0xF];
+
+                    v4_ast = u4_ast = 0;
+
+                    v4_ast |= ((i ^ (y>>8))&0xF)<<4;
+                    v4_ast |= (j ^ y_ast)&0xF;
+
+                    u4_ast |= inv_s_m[v4_ast>>4&0xF]<<4;
+                    u4_ast |= inv_s_m[v4_ast&0xF];
+
+                    u4_prm = 0;
+                    u4_prm |= ((u4>>4) ^ (u4_ast>>4))<<4;
+                    u4_prm |= (u4&0xF)^(u4_ast&0xF);
+
+                    if (((u4_prm>>4) == 6) && ((u4_prm&0xF) == 6)) {
+                        count[i][j]++;
+                    }
+                }
+            }
+        }
+    }
+
+    int max = -1;
+    int k1 = 0, k2 = 0;
+    for (int i = 0; i < 16; i++) {
+        for (int j = 0; j < 16; j++) {
+            if (count[i][j] > max) {
+                max = count[i][j];
+                k1 = i;
+                k2 = j;
+            }
+        }
+    }
+    printf("%d, %d\n", k1, k2);
+}
+
+unsigned short LAX[pairs_cnt] = {0};
+unsigned short LAY[pairs_cnt] = {0};
+
+unsigned short DAX[da_pairs_cnt] = {0};
+unsigned short DAY[da_pairs_cnt] = {0};
+unsigned short DAXART[da_pairs_cnt] = {0};
+unsigned short DAYART[da_pairs_cnt] = {0};
 
 int main() {
-
+#ifdef LA
     uint32_t K0 = 0x3A94D63F;
     unsigned short K_all[Nr+1];
     geneRoundKeys(K0, K_all);
 
     srand(time(NULL));
     for (int i = 0; i < pairs_cnt; i++) {
-        X[i] = rand()%UINT16_MAX;
-        Y[i] = spn_encrypt(X[i], sTrans, pTrans, K_all);
+        LAX[i] = rand()%UINT16_MAX;
+        LAY[i] = spn_encryption(LAX[i], sTrans, pTrans, K_all);
     }
 
     clock_t start, end;
     start = clock();
-    linear_attack(X, Y);
+    linear_attack(LAX, LAY);
     end = clock();
     double during = (double)(end - start)/CLOCKS_PER_SEC;
     printf("%f\n", during);
+#else
+
+    uint32_t K0 = 0x3A94D63F;
+    unsigned short K_all[Nr+1];
+    geneRoundKeys(K0, K_all);
+
+    srand(time(NULL));
+
+    unsigned short x, x_ast;
+    for (int i = 0; i < da_pairs_cnt; i++) {
+        DAX[i] = x = rand()%UINT16_MAX;
+        x_ast = 0;
+        for (int j = 0; j < 4; j++) {
+            x_ast |= (((x >> (4*(3-j)))&0xF) ^ input_or) << (4*(3-j));
+        }
+        DAXART[i] = x_ast;
+        DAY[i]  = spn_encryption(x, sTrans, pTrans, K_all);
+        DAYART[i] = sTrans(x_ast, s_m);
+    }
+    differential_cryptanalysis(DAX, DAXART, DAY, DAYART, da_pairs_cnt);
+
+#endif
+
     return 0;
 }
+
