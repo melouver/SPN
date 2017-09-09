@@ -139,9 +139,6 @@ int main() {
         Y[i] = spn_encrypt(X[i], sTrans, pTrans, K_all);
     }
 
-
-
-    
     clock_t start, end;
     start = clock();
     linear_attack(X, Y);
