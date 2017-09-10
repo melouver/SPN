@@ -130,7 +130,7 @@ void differential_cryptanalysis(unsigned short x, unsigned short Y[], unsigned s
     int count[16][16] = {0};
     unsigned short y, y_ast;
     unsigned short v2, v4, u2, u4, y2, y4, y2x, y4x, v2x, v4x, u2x, u4x, u2p, u4p;
-
+    int pairs = 0;
     for (int cnt = 0; cnt < T; cnt++) {
         y = Y[cnt]; y_ast = Y_astrk[cnt];
         y2 = (y >> 8)&0xF;
@@ -160,6 +160,9 @@ void differential_cryptanalysis(unsigned short x, unsigned short Y[], unsigned s
                     }
                 }
             }
+            if (pairs++ == 50) {
+                break;
+            }
         }
     }
 
@@ -176,7 +179,7 @@ void differential_cryptanalysis(unsigned short x, unsigned short Y[], unsigned s
     }
 
 
-
+    //printf("%d, %d\n", k1, k2, max);
     y = Y[0];
     unsigned short test = 0;
 
@@ -196,7 +199,7 @@ void differential_cryptanalysis(unsigned short x, unsigned short Y[], unsigned s
         geneRoundKeys(K, roundKey);test = spn_encryption(x, sTrans, pTrans, roundKey);
 
         if (test == y) {
-            printf("%x %x %x\n", x, K, y);
+            //printf("%x %x %x\n", x, K, y);
         }
     }
 }
@@ -239,8 +242,12 @@ int main() {
         DAY[i]  = spn_encryption(DAX[i], sTrans, pTrans, K_all);
         DAYART[i] = spn_encryption(DAXART[i], sTrans, pTrans, K_all);
     }
-
+    clock_t start, end;
+    start = clock();
     differential_cryptanalysis(DAX[0], DAY, DAYART, da_pairs_cnt);
+    end = clock();
+    double during = (double)(end - start)/CLOCKS_PER_SEC;
+    printf("%f\n", during);
 #endif
 
     return 0;
