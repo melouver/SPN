@@ -3,7 +3,6 @@
 //
 
 #include <cstdio>
-#include <cstring>
 #include <cstdlib>
 #include <ctime>
 
@@ -15,7 +14,7 @@ const int Nr = 4;
 const int l = 4;
 const int m = 4;
 const int pairs_cnt = 8000;
-const int da_pairs_cnt = 80;
+const int da_pairs_cnt = 1000;
 char input_or = 0xB;
 
 unsigned s_m[] = {14,4,13,1,2,15,11,8,3,10,6,12,5,9,0,7};
@@ -75,7 +74,7 @@ void linear_attack(unsigned short X[pairs_cnt], unsigned short Y[pairs_cnt]) {
                 v4 |= ((i ^ (y>>8))&0xF)<<4;
                 v4 |= (j ^ y)&0xF;
 
-                u4 |= inv_s_m[v4>>4&0xF]<<4;
+                u4 |= inv_s_m[(v4>>4)&0xF]<<4;
                 u4 |= inv_s_m[v4&0xF];
 
                 char z = ((x>>11) ^ (x>>9) ^ (x>>8) ^ (u4>>6) ^ (u4>>4) ^ (u4>>2)^ u4)&0x1;
@@ -98,6 +97,8 @@ void linear_attack(unsigned short X[pairs_cnt], unsigned short Y[pairs_cnt]) {
             }
         }
     }
+
+    printf("%d, %d, %d\n", k1, k2, max);
 
     x = X[0];
     y = Y[0];
@@ -124,39 +125,37 @@ void linear_attack(unsigned short X[pairs_cnt], unsigned short Y[pairs_cnt]) {
     }
 }
 
-void differential_cryptanalysis(unsigned short X[], unsigned short X_astrk[], unsigned short Y[], unsigned short Y_astrk[], int T) {
-    int count[16][16] = {0};
-    unsigned short x, x_ast, y, y_ast;
-    char v4, u4, v4_ast, u4_ast, u4_prm;
 
-    for (int i = 0; i < T; i++) {
-        x = X[i]; x_ast = X_astrk[i]; y = Y[i]; y_ast = Y_astrk[i];
+void differential_cryptanalysis(unsigned short x, unsigned short Y[], unsigned short Y_astrk[], int T) {
+    int count[16][16] = {0};
+    unsigned short y, y_ast;
+    unsigned short v2, v4, u2, u4, y2, y4, y2x, y4x, v2x, v4x, u2x, u4x, u2p, u4p;
+
+    for (int cnt = 0; cnt < T; cnt++) {
+        y = Y[cnt]; y_ast = Y_astrk[cnt];
+        y2 = (y >> 8)&0xF;
+        y4 = y & 0xF;
+        y2x = (y_ast>>8)&0xF;
+        y4x = y_ast & 0xF;
 
         if (((y >> 12) == (y_ast>>12)) &&
                 (((y >> 4)&0xF) == ((y_ast>>4)&0xF))) {
             for (int i = 0; i < 16; i++) {
                 for (int j = 0; j < 16; j++) {
-                    u4 = v4 = 0;
+                    v2 = (i ^ y2);
+                    v4 = (j ^ y4);
+                    u2 = inv_s_m[v2];
+                    u4 = inv_s_m[v4];
 
-                    v4 |= ((i ^ (y>>8))&0xF)<<4;
-                    v4 |= (j ^ y)&0xF;
+                    v2x = i ^ y2x;
+                    v4x = j ^ y4x;
+                    u2x = inv_s_m[v2x];
+                    u4x = inv_s_m[v4x];
 
-                    u4 |= inv_s_m[v4>>4&0xF]<<4;
-                    u4 |= inv_s_m[v4&0xF];
+                    u2p = u2 ^ u2x;
+                    u4p = u4 ^ u4x;
 
-                    v4_ast = u4_ast = 0;
-
-                    v4_ast |= ((i ^ (y>>8))&0xF)<<4;
-                    v4_ast |= (j ^ y_ast)&0xF;
-
-                    u4_ast |= inv_s_m[v4_ast>>4&0xF]<<4;
-                    u4_ast |= inv_s_m[v4_ast&0xF];
-
-                    u4_prm = 0;
-                    u4_prm |= ((u4>>4) ^ (u4_ast>>4))<<4;
-                    u4_prm |= (u4&0xF)^(u4_ast&0xF);
-
-                    if (((u4_prm>>4) == 6) && ((u4_prm&0xF) == 6)) {
+                    if (u2p == 6 && u4p == 6) {
                         count[i][j]++;
                     }
                 }
@@ -164,7 +163,7 @@ void differential_cryptanalysis(unsigned short X[], unsigned short X_astrk[], un
         }
     }
 
-    int max = -1;
+    int max = 0;
     int k1 = 0, k2 = 0;
     for (int i = 0; i < 16; i++) {
         for (int j = 0; j < 16; j++) {
@@ -175,7 +174,31 @@ void differential_cryptanalysis(unsigned short X[], unsigned short X_astrk[], un
             }
         }
     }
-    printf("%d, %d\n", k1, k2);
+
+
+
+    y = Y[0];
+    unsigned short test = 0;
+
+    int CNT = 0;
+    for (int i = 0; i < 0xFFFFFF; i++) {
+        unsigned short roundKey[Nr+1] = {0};
+
+        uint32_t K = 0;
+        K |= k1 << 8;
+        K |= k2;
+        for (int j = 0; j < 5; j++) {
+            K |= (i >> 4*(5-j)) << 4*(7-j);
+        }
+
+        K |= (i&0xF)<<4;
+
+        geneRoundKeys(K, roundKey);test = spn_encryption(x, sTrans, pTrans, roundKey);
+
+        if (test == y) {
+            printf("%x %x %x\n", x, K, y);
+        }
+    }
 }
 
 unsigned short LAX[pairs_cnt] = {0};
@@ -205,26 +228,19 @@ int main() {
     double during = (double)(end - start)/CLOCKS_PER_SEC;
     printf("%f\n", during);
 #else
-
     uint32_t K0 = 0x3A94D63F;
     unsigned short K_all[Nr+1];
     geneRoundKeys(K0, K_all);
-
     srand(time(NULL));
 
-    unsigned short x, x_ast;
     for (int i = 0; i < da_pairs_cnt; i++) {
-        DAX[i] = x = rand()%UINT16_MAX;
-        x_ast = 0;
-        for (int j = 0; j < 4; j++) {
-            x_ast |= (((x >> (4*(3-j)))&0xF) ^ input_or) << (4*(3-j));
-        }
-        DAXART[i] = x_ast;
-        DAY[i]  = spn_encryption(x, sTrans, pTrans, K_all);
-        DAYART[i] = sTrans(x_ast, s_m);
+        DAX[i] = rand()%UINT16_MAX;
+        DAXART[i] = DAX[i] ^ (unsigned short)0x0B00;
+        DAY[i]  = spn_encryption(DAX[i], sTrans, pTrans, K_all);
+        DAYART[i] = spn_encryption(DAXART[i], sTrans, pTrans, K_all);
     }
-    differential_cryptanalysis(DAX, DAXART, DAY, DAYART, da_pairs_cnt);
 
+    differential_cryptanalysis(DAX[0], DAY, DAYART, da_pairs_cnt);
 #endif
 
     return 0;
