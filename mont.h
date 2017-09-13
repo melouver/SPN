@@ -12,7 +12,7 @@
 //GMP中，每个单精度整数占用多少比特
 #define MONTBITS (8*sizeof(mp_limb_t))
 //假设蒙哥马利中的T=XY的最大位数不超过MONT_MAX个整数
-#define MONT_MAX 64
+#define MONT_MAX 128
 //随机数状态
 gmp_randstate_t state;
 
@@ -116,6 +116,7 @@ void Mont_Test()
 	t1 = clock();
 	for (i = 0; i < TESTCOUNT; i++) {
 		Mont_Exp(r1, base, exp, mod);
+        gmp_printf("y = %Zd\n", r1);
 	}
 	t2 = clock();
 	printf("蒙哥马利算法用时 : \t%lf\n", (double)(t2 - t1) / TESTCOUNT);
@@ -126,7 +127,7 @@ void Mont_Test()
 
 
 
-int main(int argc,char* argv[])
+int maijn(int argc,char* argv[])
 {
 	Mont_Test();
 
