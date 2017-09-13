@@ -4,7 +4,7 @@ project(SPN_9_9)
 set(CMAKE_CXX_STANDARD 11)
 
 set(SPN_SRC spn.cpp)
-set(RSA_SRC RSA.cpp)
+set(RSA_SRC  mont.cpp rsa.cpp)
 
 add_executable(spn ${SPN_SRC})
 

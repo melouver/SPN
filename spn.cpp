@@ -5,7 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
-
+#include <vector>
 
 typedef unsigned short (*pBoxTrans)(unsigned short);
 typedef unsigned short (*sBoxTrans)(unsigned short, unsigned[]);
@@ -16,6 +16,8 @@ const int m = 4;
 const int pairs_cnt = 8000;
 const int da_pairs_cnt = 1000;
 char input_or = 0xB;
+
+using namespace std;
 
 unsigned s_m[] = {14,4,13,1,2,15,11,8,3,10,6,12,5,9,0,7};
 unsigned p_m[] = {1,5,9,13,2,6,10,14,3,7,11,15,4,8,12,16};
@@ -126,9 +128,9 @@ void linear_attack(unsigned short X[pairs_cnt], unsigned short Y[pairs_cnt]) {
 }
 
 
-void differential_cryptanalysis(unsigned short x, unsigned short Y[], unsigned short Y_astrk[], int T) {
+void differential_cryptanalysis(unsigned short X[],  unsigned short Y[], unsigned short Y_astrk[], int T) {
     int count[16][16] = {0};
-    unsigned short y, y_ast;
+    unsigned short x, y, y_ast;
     unsigned short v2, v4, u2, u4, y2, y4, y2x, y4x, v2x, v4x, u2x, u4x, u2p, u4p;
     int pairs = 0;
     for (int cnt = 0; cnt < T; cnt++) {
@@ -160,7 +162,7 @@ void differential_cryptanalysis(unsigned short x, unsigned short Y[], unsigned s
                     }
                 }
             }
-            if (pairs++ == 50) {
+            if (pairs++ == 80) {
                 break;
             }
         }
@@ -180,14 +182,18 @@ void differential_cryptanalysis(unsigned short x, unsigned short Y[], unsigned s
 
 
     //printf("%d, %d\n", k1, k2, max);
+    x = X[0];
     y = Y[0];
     unsigned short test = 0;
 
     int CNT = 0;
-    for (int i = 0; i < 0xFFFFFF; i++) {
-        unsigned short roundKey[Nr+1] = {0};
+    vector<u_int32_t > TMP;
 
-        uint32_t K = 0;
+    unsigned short roundKey[Nr+1] = {0};
+    for (int i = 0; i < 0xFFFFFF; i++) {
+
+
+        u_int32_t K = 0;
         K |= k1 << 8;
         K |= k2;
         for (int j = 0; j < 5; j++) {
@@ -196,10 +202,35 @@ void differential_cryptanalysis(unsigned short x, unsigned short Y[], unsigned s
 
         K |= (i&0xF)<<4;
 
-        geneRoundKeys(K, roundKey);test = spn_encryption(x, sTrans, pTrans, roundKey);
+        geneRoundKeys(K, roundKey);
 
+        test = spn_encryption(x, sTrans, pTrans, roundKey);
         if (test == y) {
-            //printf("%x %x %x\n", x, K, y);
+            TMP.push_back(K);
+            CNT++;
+        }
+    }
+    int tmp = CNT;
+    vector<char> v(CNT, 1);
+    int idx = 1;
+    while (CNT > 1) {
+        for (int i = 0; i < tmp; i++) {
+            if (v[i] != 1) {
+                continue;
+            }
+            geneRoundKeys(TMP[i], roundKey);
+            test = spn_encryption(X[idx], sTrans, pTrans, roundKey);
+            if (test != Y[idx]) {
+                v[i] = 0;
+                CNT--;
+            }
+        }
+        idx++;
+    }
+
+    for (int i = 0; i < tmp; i++) {
+        if (v[i] == 1) {
+            //printf("%x\n", TMP[i]);
         }
     }
 }
@@ -244,7 +275,7 @@ int main() {
     }
     clock_t start, end;
     start = clock();
-    differential_cryptanalysis(DAX[0], DAY, DAYART, da_pairs_cnt);
+    differential_cryptanalysis(DAX, DAY, DAYART, da_pairs_cnt);
     end = clock();
     double during = (double)(end - start)/CLOCKS_PER_SEC;
     printf("%f\n", during);
