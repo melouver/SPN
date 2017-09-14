@@ -22,6 +22,9 @@ using namespace std;
 unsigned s_m[] = {14,4,13,1,2,15,11,8,3,10,6,12,5,9,0,7};
 unsigned p_m[] = {1,5,9,13,2,6,10,14,3,7,11,15,4,8,12,16};
 unsigned inv_s_m[] = {14,3,4,8,1,12,10,15,7,13,9,6,11,2,0,5};
+unsigned inv_p_m[] = {1,5,9,13,2,6,10,14,3,7,11,15,4,8,12,16};
+
+
 
 unsigned short sTrans(unsigned short u, unsigned s[]) {
     unsigned short res = 0;
@@ -38,6 +41,15 @@ unsigned short pTrans(unsigned short v) {
     }
     return res;
 }
+
+unsigned short pTransd(unsigned short v) {
+    unsigned short res = 0;
+    for (int i = 1; i <= 16; i++) {
+        res |= ((v>>(16-inv_p_m[i-1]))&0x1) << (16-i);
+    }
+    return res;
+}
+
 
 void geneRoundKeys(uint32_t k, unsigned short K_all[Nr+1]) {
     for (int i = 0; i < Nr + 1; i++) {
@@ -57,6 +69,20 @@ unsigned  short spn_encryption(unsigned short x, sBoxTrans pi_s, pBoxTrans pi_p,
     v = pi_s(u, s_m);
     return  v ^ K_all[Nr];
 }
+
+unsigned short spn_decry(unsigned short y, unsigned short *K_all) {
+    unsigned short w, u, v;
+    v = y ^ K_all[Nr];
+    u = sTrans(v, inv_s_m);
+    w = u ^ K_all[Nr-1];
+    for (int r = Nr-1; r > 0; r--) {
+        v = pTransd(w);
+        u = sTrans(v, inv_s_m);
+        w = u ^ K_all[r-1];
+    }
+    return w;
+}
+
 
 void linear_attack(unsigned short X[pairs_cnt], unsigned short Y[pairs_cnt]) {
     int count[16][16] = {0};

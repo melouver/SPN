@@ -41,6 +41,29 @@ void parameter_generator(mpz_t n, mpz_t p, mpz_t q, mpz_t a, mpz_t b) {
 
 #define KeyBits 1024
 #define TSTCNT 500
+/*
+void Multiplicative_inverse(mpz_t a, mpz_t b, mpz_t t) {
+    mpz_t a0, b0, t0, t, q, r, tmp;
+    mpz_inits(t,a,b,t0,q,r,tmp, NULL);
+
+    mpz_set(a0, a);
+    mpz_set(b0, b);
+    mpz_set_ui(t0, 0);
+    mpz_set_ui(t, 1);
+    mpz_fdiv_q(q, a0, b0);
+    mpz_submul(a0,q,b0);
+    mpz_set(r,a0);
+
+    while (mpz_cmp_ui(r, 0) > 0) {
+        mpz_submul(t0, q, t);
+        mpz_mod(tmp,t0,a);
+        mpz_set(t0,t);
+        mpz_set(t,tmp);
+        mpz_set(a0,b0);
+        mpz_set(b0,r);
+    }
+}
+*/
 
 int main() {
     mpz_t n, p, q, a, b;
