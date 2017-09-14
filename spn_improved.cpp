@@ -8,6 +8,8 @@
 #include <cstdio>
 #include <cmath>
 #include <inttypes.h>
+#include <fcntl.h>
+#include <cstdlib>
 
 unsigned s_m[] = {14, 4, 13, 1, 2, 15, 11, 8, 3, 10, 6, 12, 5, 9, 0, 7};
 unsigned inv_s_m[] = {14,3,4,8,1,12,10,15,7,13,9,6,11,2,0,5};
@@ -82,11 +84,6 @@ uint64_t spn_encryption64(uint64_t x, uint64_t *K_all) {
         v = sTrans64(u, s_m);
         w = pTrans64(v, p_m);
 
-        printf("w=%" PRIx64 "\n", w);
-        printf("K=%" PRIx64 "\n", K_all[r-1]);
-        printf("u=%" PRIx64 "\n", u);
-        printf("v=%" PRIx64 "\n", v);
-
 
     }
     u = w ^ K_all[Nr64-1];
@@ -117,8 +114,73 @@ int main () {
     uint64_t K0 = 0x3A94D63F3A94D63F;
     uint64_t K_all[Nr64+1];
     geneRoundKeys64(K0, K_all);
-    uint64_t x = 0x12FFFF0000000000, y;
-    y = spn_encryption64(x, K_all);
-    printf("%" PRIx64 "\n", spn_decryption64(y, K_all));
+    /*
+    unsigned char tmp[8];
+    for (int i = 0; i < 8; i++) {
+        tmp[7-i] = ((K0 >> (8 * i)) & 0xFF);
+    }
+    uint64_t Kp = tmp[0];
+    for (int i = 1; i < 8; i++) {
+        Kp = (Kp <<8) | tmp[i];
+    }*/
+    FILE *plainfile = NULL, *cipherfile = NULL, *decryfile = NULL;
+    ;
+
+
+    unsigned char buf[8], cip[8], plain[8];
+    if ((plainfile = fopen("plain.txt", "rb"))== NULL) {
+        printf("cannot open plain txt\n");
+        exit(-1);
+    }
+    if ((cipherfile = fopen("cipher.txt", "w+")) == NULL) {
+        printf("cannot open cipher txt\n");
+        exit(-1);
+    }
+    if ((decryfile = fopen("decry.txt", "wb")) == NULL) {
+        printf("cannot open decry txt\n");
+        exit(-1);
+    }
+
+    int cnt = 0;
+
+    while ((cnt=fread(buf, sizeof(unsigned char), 8, plainfile)) > 0) {
+        if (cnt < 8) {
+            for (int i = cnt; i < 8; i++) {
+                buf[i] = 8-cnt;
+            }
+        }
+        uint64_t Kp = buf[0];
+        for (int i = 1; i < 8; i++) {
+            Kp = (Kp << 8) | buf[i];
+        }
+        uint64_t res = spn_encryption64(Kp, K_all);
+
+        unsigned char tmp[8] = { 0 };
+        for (int i = 0; i < 8; i++) {
+            tmp[7-i] = ((res >> (8 * i)) & 0xFF);
+        }
+
+        if (fwrite(tmp, sizeof(unsigned char), 8, cipherfile) != 8) {
+            printf("write error! cipher\n");
+            exit(-1);
+        }
+    }
+
+    rewind(cipherfile);
+    while ((cnt = fread(cip, sizeof(unsigned char), 8, cipherfile)) > 0) {
+        if (cnt < 8) {
+
+
+        }
+
+        if (fwrite(cip, sizeof(uint64_t), 1, decryfile) != 1) {
+            printf("write error decryfile\n");
+            exit(-1);
+        }
+    }
+
+    fclose(plainfile);
+    fclose(cipherfile);
+    fclose(decryfile);
 
 }
