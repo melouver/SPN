@@ -1,4 +1,9 @@
 //
+// Created by yuzheli on 9/14/17.
+//
+
+
+//
 // Created by 李玉哲 on 14/09/2017.
 //
 
@@ -10,6 +15,8 @@
 #include <inttypes.h>
 #include <fcntl.h>
 #include <cstdlib>
+#include <ctime>
+#include <cstring>
 
 unsigned s_m[] = {14, 4, 13, 1, 2, 15, 11, 8, 3, 10, 6, 12, 5, 9, 0, 7};
 unsigned inv_s_m[] = {14,3,4,8,1,12,10,15,7,13,9,6,11,2,0,5};
@@ -114,6 +121,8 @@ int main () {
     uint64_t K0 = 0x3A94D63F3A94D63F;
     uint64_t K_all[Nr64+1];
     geneRoundKeys64(K0, K_all);
+    srand(time(NULL));
+
     /*
     unsigned char tmp[8];
     for (int i = 0; i < 8; i++) {
@@ -124,59 +133,124 @@ int main () {
         Kp = (Kp <<8) | tmp[i];
     }*/
     FILE *plainfile = NULL, *cipherfile = NULL, *decryfile = NULL;
-    ;
-
 
     unsigned char buf[8], cip[8], plain[8];
-    if ((plainfile = fopen("plain.txt", "rb"))== NULL) {
+    if ((plainfile = fopen("main", "rb"))== NULL) {
         printf("cannot open plain txt\n");
         exit(-1);
     }
-    if ((cipherfile = fopen("cipher.txt", "w+")) == NULL) {
+    if ((cipherfile = fopen("cipher", "w+")) == NULL) {
         printf("cannot open cipher txt\n");
         exit(-1);
     }
-    if ((decryfile = fopen("decry.txt", "wb")) == NULL) {
+    if ((decryfile = fopen("main2.pdf", "wb")) == NULL) {
         printf("cannot open decry txt\n");
         exit(-1);
     }
 
     int cnt = 0;
-
+    unsigned char tmp[8] = { 0 };
+    int need = 1;
+    uint64_t IV = 0xdeadbeefdeadbeef;
+    int proc = 0;
     while ((cnt=fread(buf, sizeof(unsigned char), 8, plainfile)) > 0) {
         if (cnt < 8) {
             for (int i = cnt; i < 8; i++) {
                 buf[i] = 8-cnt;
             }
+            need = 0;
         }
+        proc += cnt;
         uint64_t Kp = buf[0];
         for (int i = 1; i < 8; i++) {
             Kp = (Kp << 8) | buf[i];
         }
-        uint64_t res = spn_encryption64(Kp, K_all);
 
-        unsigned char tmp[8] = { 0 };
+        uint64_t res;
+        IV = res = spn_encryption64(Kp ^ IV, K_all);
+
         for (int i = 0; i < 8; i++) {
             tmp[7-i] = ((res >> (8 * i)) & 0xFF);
         }
 
+        /*
+        uint64_t Kp1 = tmp[0];
+        for (int i = 1; i < 8; i++) {
+            Kp1 = (Kp1 << 8) | tmp[i];
+        }
+        Kp1 = spn_decryption64(Kp1, K_all)
+        printf("%" PRId64 "\n", Kp);
+        printf("%" PRId64 "\n", Kp1);
+        */
         if (fwrite(tmp, sizeof(unsigned char), 8, cipherfile) != 8) {
             printf("write error! cipher\n");
             exit(-1);
         }
     }
+    printf("read %d bytes drop %d bytes\n", proc, tmp[7]);
+
+    unsigned char eight[8];
+    memset(eight, 8, 0x8);
+
+    if (need) {
+        uint64_t needres = eight[0];
+        for (int i = 1; i < 8; i++) {
+            needres = (needres << 8) | eight[i];
+        }
+
+        needres = spn_encryption64(needres ^ IV, K_all);
+        // needres = 0x8cb842d13972d651
+        for (int i = 0; i < 8; i++) {
+            eight[7-i] = ((needres >> (8 * i)) & 0xFF);
+        }
+
+        fwrite(eight, sizeof(unsigned char), 8, cipherfile);
+    }
+
 
     rewind(cipherfile);
+
+    int bitread = 0;
+    IV = 0xdeadbeefdeadbeef;
+    uint64_t res;
     while ((cnt = fread(cip, sizeof(unsigned char), 8, cipherfile)) > 0) {
-        if (cnt < 8) {
-
-
+        bitread += cnt;
+        uint64_t Kp = cip[0];
+        for (int i = 1; i < 8; i++) {
+            Kp = (Kp << 8) | cip[i];
         }
 
-        if (fwrite(cip, sizeof(uint64_t), 1, decryfile) != 1) {
-            printf("write error decryfile\n");
-            exit(-1);
+        res = spn_decryption64(Kp, K_all) ^ IV;
+        IV = Kp;
+
+        for (int i = 0; i < 8; i++) {
+            tmp[7-i] = ((res >> (8 * i)) & 0xFF);
         }
+    }
+
+    bitread -= tmp[7];
+
+    IV = 0xdeadbeefdeadbeef;
+    rewind(cipherfile);
+
+    while (fread(cip, sizeof(unsigned char), 8, cipherfile) > 0) {
+        uint64_t Kp = cip[0];
+        for (int i = 1; i < 8; i++) {
+            Kp = (Kp << 8) | cip[i];
+        }
+        uint64_t res = spn_decryption64(Kp, K_all) ^ IV;
+        IV = Kp;
+
+        for (int i = 0; i < 8; i++) {
+            tmp[7-i] = ((res >> (8 * i)) & 0xFF);
+        }
+        if (bitread < 8) {
+            fwrite(tmp, sizeof(unsigned char), bitread, decryfile);
+
+            break;
+        }
+        cnt = fwrite(tmp, sizeof(unsigned char), 8, decryfile);
+        bitread -= 8;
     }
 
     fclose(plainfile);
@@ -184,3 +258,5 @@ int main () {
     fclose(decryfile);
 
 }
+
+
