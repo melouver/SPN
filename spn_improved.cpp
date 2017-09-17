@@ -123,6 +123,18 @@ int main () {
     geneRoundKeys64(K0, K_all);
     srand(time(NULL));
 
+    for (int i = 0; i < 100; i++) {
+        uint64_t x = rand();
+        uint64_t y = rand();
+        for (int j = 0; j < 2; j++) {
+            x <<= 16;
+        }
+        x += y;
+        printf("x=%" PRIx64 "\n", x);
+        printf("x'=%" PRIx64 "\n", spn_decryption64(spn_encryption64(x, K_all), K_all));
+    }
+
+
     /*
     unsigned char tmp[8];
     for (int i = 0; i < 8; i++) {
@@ -135,7 +147,7 @@ int main () {
     FILE *plainfile = NULL, *cipherfile = NULL, *decryfile = NULL;
 
     unsigned char buf[8], cip[8], plain[8];
-    if ((plainfile = fopen("main", "rb"))== NULL) {
+    if ((plainfile = fopen("test", "rb"))== NULL) {
         printf("cannot open plain txt\n");
         exit(-1);
     }
@@ -143,7 +155,7 @@ int main () {
         printf("cannot open cipher txt\n");
         exit(-1);
     }
-    if ((decryfile = fopen("main2.pdf", "wb")) == NULL) {
+    if ((decryfile = fopen("rest", "wb")) == NULL) {
         printf("cannot open decry txt\n");
         exit(-1);
     }
@@ -161,7 +173,7 @@ int main () {
             need = 0;
         }
         proc += cnt;
-        uint64_t Kp = buf[0];
+        uint64_t Kp = buf[0 ];
         for (int i = 1; i < 8; i++) {
             Kp = (Kp << 8) | buf[i];
         }
